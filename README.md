@@ -87,54 +87,53 @@ Cada suite restablece PostgreSQL y MongoDB antes de ejecutarse y cierra las cone
 
 Los errores se devuelven como JSON: `{ "error": "Contact not found" }`.
 
-
 ## Respuestas
 
 **1. Dos motores.**  
-Activity es buen candidato para MongoDB porque su `metadata` puede cambiar de estructura según el tipo de actividad. Company y Contact son buenos para PostgreSQL porque tienen una relación clara: una compañía puede tener varios contactos y se puede manejar con una llave foránea.
+Activity funciona bien en MongoDB porque su `metadata` puede cambiar según el tipo. Company y Contact van bien en PostgreSQL porque tienen una relación entre ellas mediante `companyId`.
 
 **2. ORM vs ODM.**  
-Un ORM permite trabajar con una base de datos relacional usando objetos y modelos; en este proyecto se usa Sequelize. Un ODM hace algo parecido pero con documentos de una base documental; aquí se usa Mongoose. La diferencia principal es el tipo de base que representa cada uno.
+Un ORM sirve para trabajar con bases relacionales usando modelos y objetos. En este proyecto se usa Sequelize. Un ODM hace algo parecido pero con documentos de MongoDB, usando Mongoose.
 
 **3. Configuración por variables de entorno.**  
-Las variables están definidas en `.devcontainer/docker-compose.yml` y también se muestran en `.env.example`. Es mala práctica ponerlas en los `.js` porque las credenciales quedarían expuestas y sería más difícil cambiarlas. La app usa `postgres` en `DB_HOST` y `mongo` en `MONGODB_URI` porque esos son los nombres de los servicios dentro de Docker, no `localhost`.
+Las variables están en `.devcontainer/docker-compose.yml` y en `.env.example`. No conviene poner las credenciales en los archivos `.js` porque quedarían expuestas. La app usa `postgres` y `mongo` porque son los nombres de los servicios de Docker.
 
 **4. Asociaciones.**  
-En `models/sequelize/index.js`, `Company` tiene muchos `Contact` usando `companyId` como llave foránea en la tabla `Contact`. El alias `as: 'contacts'` es el nombre con el que Sequelize agrega esa relación al resultado cuando usamos el `include`.
+En `models/sequelize/index.js`, una Company puede tener muchos Contact. La llave foránea es `companyId` y está en Contact. El alias `contacts` sirve para identificar esa relación cuando se usa `include`.
 
 **5. Eager loading.**  
-Hacer una consulta para la compañía y otra para sus contactos significa buscar los datos por separado. Con `include` se pueden cargar en la misma operación de Sequelize, dejando la respuesta lista con `contacts`. Para este caso es preferible porque la relación se solicita desde la misma consulta.
+Se podría traer primero la compañía y después hacer otra consulta para los contactos. Con `include` se pueden traer juntos, y para este caso es más práctico porque la respuesta ya incluye `contacts`.
 
 **6. Instancia vs consulta.**  
-Buscar primero la instancia y después usar `contact.update(...)` permite trabajar con el registro encontrado y devolver esa instancia ya modificada. Con `Model.update(...)` se actualizan registros directamente usando un `where`, pero la operación está más orientada a modificar registros que a trabajar con una instancia concreta y devolverla completa.
+Con la instancia primero busco el contacto y después hago `contact.update()`, por lo que puedo devolver ese mismo registro actualizado. Con `Model.update()` se modifica usando un `where` y la respuesta no está enfocada en devolver la instancia completa.
 
 **7. Esquema flexible.**  
-En `models/mongoose/activity.js`, `metadata` usa `mongoose.Schema.Types.Mixed`. Esto permite guardar objetos diferentes para `CALL`, `EMAIL` y `MEETING`, incluso con arreglos o campos distintos. La desventaja es que se pierde parte de la validación específica que habría si cada campo tuviera un tipo definido.
+En `models/mongoose/activity.js`, `metadata` usa `Schema.Types.Mixed`. Por eso puede guardar diferentes estructuras para CALL, EMAIL y MEETING. La desventaja es que hay menos validación específica.
 
 **8. Sin ref.**  
-`contactId` y `userId` son números que apuntan a registros de PostgreSQL y el esquema no tiene `ref` de Mongoose. Por eso Mongoose no puede usar `populate` para traerlos automáticamente. También significa que MongoDB no controla esa relación; por ejemplo, se podría eliminar un User en PostgreSQL y quedar un `userId` en Activity que ya no corresponda a un usuario existente.
+`contactId` y `userId` son números que corresponden a registros de PostgreSQL y no tienen `ref` en Mongoose. Por eso no se puede usar `populate`. Si se borra un usuario en PostgreSQL, MongoDB podría conservar ese `userId`.
 
 **9. Documento actualizado.**  
-Antes de corregir el Reto 08, `findByIdAndUpdate()` devolvía por defecto el documento que estaba antes del cambio. En `controllers/activities.js` se agregaron `new: true` para obtener el documento actualizado y `runValidators: true` para validar los datos según el esquema.
+Antes, `findByIdAndUpdate()` devolvía el documento anterior. En `controllers/activities.js` se agregó `new: true` para devolver el nuevo documento y `runValidators: true` para validar los datos.
 
 **10. Pruebas de comportamiento.**  
-Probar el comportamiento permite comprobar que la API realmente responde como debe sin depender de un método interno específico. Así se puede cambiar la implementación mientras se mantenga el mismo resultado para quien usa la API.
+Así se comprueba lo que realmente hace la API sin depender de una función interna. Mientras la respuesta sea correcta, se puede cambiar la forma de hacerlo.
 
 **11. Repetibilidad.**  
-`tests/setup.js` conecta las dos bases y ejecuta `reset()` antes de cada suite; al final cierra las conexiones. Esto hace que cada conjunto de pruebas empiece con los mismos datos y por eso `npm test` puede dar el mismo resultado cada vez.
+En `tests/setup.js` se conectan las bases y se ejecuta `reset()` antes de cada suite. Al final se cierran las conexiones. Así cada prueba empieza con los mismos datos.
 
 **12. Tu experiencia.**  
-El reto que más trabajo me dio al revisar el código fue el 08 porque la actualización sí se hacía, pero la respuesta mostraba el documento anterior. Al revisar `controllers/activities.js` y el comportamiento esperado por Jest, quedó claro que hacía falta usar `new: true` y también `runValidators: true`.
+El Reto 08 fue de los que más tuve que revisar porque el cambio sí se hacía, pero la respuesta mostraba el valor anterior. Al revisar el controlador y las pruebas, vi que faltaba usar `new: true` y validar la actualización.
 
 ## Evidencia
 
-En esta sección debe colocarse la captura real de la terminal del Codespace después de ejecutar:
+La captura de la terminal está incluida en esta sección y muestra la ejecución de:
 
 ```bash
 npm test
 ```
 
-La captura debe mostrar completa la línea:
+Debe verse la línea:
 
 `Test Suites: 9 passed, 9 total`
 
