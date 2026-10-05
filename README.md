@@ -138,4 +138,4 @@ La captura debe mostrar completa la línea:
 
 `Test Suites: 9 passed, 9 total`
 
-![npm test con las 9 suites en verde](evidencia-npm-test.png)
+![npm test con las 9 suites en verde](imagen_2026-10-04_182739402.png)
